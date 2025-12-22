@@ -1,4 +1,4 @@
-# Forex Dashboard con Asistencia Inteligente (OpenAI, Gemini)
+# Forex Dashboard con Asistencia Inteligente (Gemini)
 
 Una aplicación web interactiva construida con Streamlit que combina un grafico de velas (candlestick charts) para pares de divisas en tiempo real con un analista de Forex impulsado por Inteligencia Artificial (Se puede usar con Gemini o OpenAI).
 
