@@ -45,7 +45,7 @@ with col1:
     # Charts
     pairs = ["GC=F", "EURUSD=X", "JPY=X"] # GC=F (Gold), JPY=X (USD/JPY)
     # USDJPY in yfinance is usually JPY=X (USD/JPY) or similar. 
-    # Let's verify standard tickers. XAUUSD=X (Gold), EURUSD=X (Euro), JPY=X (USD/JPY).
+  
     
     for pair in pairs:
         try:

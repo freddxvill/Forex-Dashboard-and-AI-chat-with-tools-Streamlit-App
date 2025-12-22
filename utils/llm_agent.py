@@ -3,8 +3,6 @@ import requests
 import google.generativeai as genai
 from google.generativeai.types import content_types
 
-# Global variable to store the Alpha Vantage key dynamically
-ALPHA_VANTAGE_API_KEY = None
 
 API_BASE_URL = "https://www.alphavantage.co/query"
 
