@@ -1,6 +1,6 @@
-# Forex Dashboard con Asistencia Inteligente (Gemini)
+# Forex Dashboard con Asistencia Inteligente (Gemini, OpenAI, Claude)
 
-Una aplicación web interactiva construida con Streamlit que combina un grafico de velas (candlestick charts) para pares de divisas en tiempo real con un analista de Forex impulsado por Inteligencia Artificial (Gemini o OpenAI).
+Una aplicación web interactiva construida con Streamlit que combina un grafico de velas (candlestick charts) para pares de divisas en tiempo real con un analista de Forex impulsado por Inteligencia Artificial (Gemini, OpenAI, Claude).
 
 ![Dashboard](images/dashboard.png)
 
@@ -15,7 +15,7 @@ Una aplicación web interactiva construida con Streamlit que combina un grafico 
 - **Auto-actualización:** Botón dedicado para refrescar los datos de mercado.
 
 ### 🤖 AI Financial Analyst
-- **Chat Inteligente:** Integrado con **Google Gemini** (modelo `gemini-2.5-flash` o superior).
+- **Chat Inteligente:** Integrado con **Google Gemini** (modelo `gemini-2.5-flash` o superior), **OpenAI** (modelo `gpt-4o` o superior) y **Anthropic Claude** (modelo `claude-3-5-sonnet-20240620` o superior).
 - **Herramientas Avanzadas (Alpha Vantage):** El agente tiene acceso a 11 herramientas financieras reales para responder tus preguntas con datos precisos:
     - **Precios:** `FX_DAILY`, `FX_INTRADAY`, `FX_WEEKLY`, `FX_MONTHLY`.
     - **Sentimiento:** `NEWS_SENTIMENT` (Noticias y análisis de sentimiento).
@@ -33,6 +33,8 @@ Una aplicación web interactiva construida con Streamlit que combina un grafico 
 - **uv**: Un gestor de paquetes de Python extremadamente rápido.
 - **API Keys**:
     - [Google Gemini API Key](https://aistudio.google.com/app/apikey)
+    - [OpenAI API Key](https://platform.openai.com/account/api-keys)
+    - [Anthropic Claude API Key](https://console.anthropic.com/api)
     - [Alpha Vantage API Key](https://www.alphavantage.co/support/#api-key)
 
 ## Instalación
@@ -69,7 +71,11 @@ El proyecto incluye un `Dockerfile` optimizado. Para construir y ejecutar con Do
 docker build -t forex-dashboard .
 
 # Ejecutar el contenedor
-docker run -d -p 8501:8501 forex-dashboard
+docker run -d \
+  --name forex-app \
+  --restart always \
+  -p 8501:8501 \
+  forex-dashboard
 ```
 
 ## Configuración en la App
