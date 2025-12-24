@@ -1,10 +1,14 @@
 import os
 import requests
-import google.generativeai as genai
-from google.generativeai.types import content_types
-
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langchain.tools import tool
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 API_BASE_URL = "https://www.alphavantage.co/query"
+ALPHA_VANTAGE_API_KEY = None
 
 def call_api_tool(function_name, **params):
     """
@@ -23,6 +27,7 @@ def call_api_tool(function_name, **params):
 
 # --- Tool Definitions ---
 
+@tool
 def get_fx_daily(from_symbol: str, to_symbol: str):
     """
     Obtiene los precios diarios de Forex para un par de divisas.
@@ -34,6 +39,7 @@ def get_fx_daily(from_symbol: str, to_symbol: str):
     """
     return call_api_tool("FX_DAILY", from_symbol=from_symbol, to_symbol=to_symbol)
 
+@tool
 def get_fx_intraday(from_symbol: str, to_symbol: str, interval: str = "5min"):
     """
     Obtiene los precios intradía de Forex para un par de divisas.
@@ -46,25 +52,40 @@ def get_fx_intraday(from_symbol: str, to_symbol: str, interval: str = "5min"):
     """
     return call_api_tool("FX_INTRADAY", from_symbol=from_symbol, to_symbol=to_symbol, interval=interval)
 
+@tool
 def get_fx_weekly(from_symbol: str, to_symbol: str):
     """
     Obtiene los precios semanales de Forex para un par de divisas.
+    Args:
+        from_symbol: Símbolo de la divisa de origen (ej. "EUR")
+        to_symbol: Símbolo de la divisa de destino (ej. "USD")
     Returns:
         Datos JSON con series temporales semanales.
     """
     return call_api_tool("FX_WEEKLY", from_symbol=from_symbol, to_symbol=to_symbol)
 
+@tool
 def get_fx_monthly(from_symbol: str, to_symbol: str):
     """
     Obtiene los precios mensuales de Forex para un par de divisas.
+    Args:
+        from_symbol: Símbolo de la divisa de origen (ej. "EUR")
+        to_symbol: Símbolo de la divisa de destino (ej. "USD")
     Returns:
         Datos JSON con series temporales mensuales.
     """
     return call_api_tool("FX_MONTHLY", from_symbol=from_symbol, to_symbol=to_symbol)
 
+@tool
 def get_news_sentiment(tickers: str = None, topics: str = None, time_from: str = None, time_to: str = None, limit: int = 50):
     """
-    Obtiene noticias financieras con análisis de sentimiento.
+    Obtiene noticias financieras con análisis de sentimiento de Alpha Vantage.
+    Args:
+        tickers: Tickers a buscar noticias (ej. "EUR,USD")
+        topics: Temas a buscar (ej. "economy_fiscal")
+        time_from: Fecha de inicio (YYYYMMDDTHHMM)
+        time_to: Fecha de fin (YYYYMMDDTHHMM)
+        limit: Límite de resultados
     """
     params = {}
     if tickers: params["tickers"] = tickers
@@ -74,140 +95,73 @@ def get_news_sentiment(tickers: str = None, topics: str = None, time_from: str =
     params["limit"] = limit
     return call_api_tool("NEWS_SENTIMENT", **params)
 
-def _build_symbol(from_symbol=None, to_symbol=None, symbol=None):
-    if symbol:
-        return symbol.upper()
-    if from_symbol and to_symbol:
-        return f"{from_symbol.upper()}{to_symbol.upper()}"
-    return None
-
-def get_sma(from_symbol: str = None, to_symbol: str = None, symbol: str = None, interval: str = "daily", time_period: int = 10, series_type: str = "close"):
-    """Obtiene el Simple Moving Average (SMA)."""
-    sym = _build_symbol(from_symbol, to_symbol, symbol)
-    if not sym: return {"error": "Missing symbol info"}
-    return call_api_tool("SMA", symbol=sym, interval=interval, time_period=time_period, series_type=series_type)
-
-def get_ema(from_symbol: str = None, to_symbol: str = None, symbol: str = None, interval: str = "daily", time_period: int = 10, series_type: str = "close"):
-    """Obtiene el Exponential Moving Average (EMA)."""
-    sym = _build_symbol(from_symbol, to_symbol, symbol)
-    if not sym: return {"error": "Missing symbol info"}
-    return call_api_tool("EMA", symbol=sym, interval=interval, time_period=time_period, series_type=series_type)
-
-def get_macd(from_symbol: str = None, to_symbol: str = None, symbol: str = None, interval: str = "daily", series_type: str = "close", fast_period: int = 12, slow_period: int = 26, signal_period: int = 9):
-    """Obtiene el MACD."""
-    sym = _build_symbol(from_symbol, to_symbol, symbol)
-    if not sym: return {"error": "Missing symbol info"}
-    return call_api_tool("MACD", symbol=sym, interval=interval, series_type=series_type, fastperiod=fast_period, slowperiod=slow_period, signalperiod=signal_period)
-
-def get_rsi(from_symbol: str = None, to_symbol: str = None, symbol: str = None, interval: str = "daily", time_period: int = 14, series_type: str = "close"):
-    """Obtiene el RSI."""
-    sym = _build_symbol(from_symbol, to_symbol, symbol)
-    if not sym: return {"error": "Missing symbol info"}
-    return call_api_tool("RSI", symbol=sym, interval=interval, time_period=time_period, series_type=series_type)
-
-def get_adx(from_symbol: str = None, to_symbol: str = None, symbol: str = None, interval: str = "daily", time_period: int = 14):
-    """Obtiene el ADX."""
-    sym = _build_symbol(from_symbol, to_symbol, symbol)
-    if not sym: return {"error": "Missing symbol info"}
-    return call_api_tool("ADX", symbol=sym, interval=interval, time_period=time_period)
-
-def get_bbands(from_symbol: str = None, to_symbol: str = None, symbol: str = None, interval: str = "daily", time_period: int = 20, series_type: str = "close", nbdevup: int = 2, nbdevdn: int = 2, matype: int = 0):
-    """Obtiene las Bollinger Bands."""
-    sym = _build_symbol(from_symbol, to_symbol, symbol)
-    if not sym: return {"error": "Missing symbol info"}
-    return call_api_tool("BBANDS", symbol=sym, interval=interval, time_period=time_period, series_type=series_type, nbdevup=nbdevup, nbdevdn=nbdevdn, matype=matype)
-
 # --- Main Agent Logic ---
 
 def get_llm_response(prompt, config):
     """
     Main entry point called by the Streamlit app.
-    Adapts the specific Gemini tool logic.
+    Uses LangChain to support multiple providers.
     """
     global ALPHA_VANTAGE_API_KEY
     
     provider = config.get("provider")
+    openai_key = config.get("openai_key")
     gemini_key = config.get("gemini_key")
+    claude_key = config.get("claude_key")
     av_key = config.get("av_key")
     
-    if provider != "Gemini":
-        return "Advanced Forex Tools are currently only available with Gemini. Please select Gemini as the provider."
-
-    if not gemini_key or not av_key:
-        return "Please provide both Gemini and Alpha Vantage API keys."
-
-    # Set keys
     ALPHA_VANTAGE_API_KEY = av_key
-    genai.configure(api_key=gemini_key)
     
-    tools_list = [
-        get_fx_daily, get_fx_intraday, get_fx_weekly, get_fx_monthly, 
-        get_news_sentiment, get_sma, get_ema, get_macd, get_rsi, 
-        get_adx, get_bbands
-    ]
+    # Initialize appropriate Chat Model
+    if provider == "Gemini":
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=gemini_key)
+    elif provider == "OpenAI":
+        llm = ChatOpenAI(model="gpt-4o", openai_api_key=openai_key)
+    elif provider == "Claude":
+        llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", anthropic_api_key=claude_key)
+    else:
+        return f"Unsupported provider: {provider}"
+
+    tools = [get_fx_daily, get_fx_intraday, get_fx_weekly, get_fx_monthly, get_news_sentiment]
     
-    # Initialize Model with Tools
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash", 
-        tools=tools_list
+    # Load system prompt complement from file
+    try:
+        # Check both possible locations for the prompt file
+        prompt_path = "utils/promp.txt"
+        if not os.path.exists(prompt_path):
+            prompt_path = "promp.txt"
+            
+        with open(prompt_path, "r", encoding="utf-8") as file:
+            prompt_complementario = file.read()
+    except Exception:
+        prompt_complementario = ""
+
+    system_instruction = (
+        "Eres un analista experto en Forex. Usa los tools disponibles para obtener precios, indicadores técnicos, noticias y sentimientos. "
+        "Analiza la consulta del usuario y proporciona un análisis detallado, incluyendo tendencias basadas en promedios móviles, "
+        "precios recientes, sentimientos de noticias y recomendaciones basadas en datos.\n"
+        "IMPORTANTE: Si falta un parámetro obligatorio (como 'symbol'), intenta inferirlo o preguntar. Para 'symbol', usa el formato estándar (ej. EURUSD, USDJPY).\n"
+        f"Información adicional del contexto: {prompt_complementario}\n"
+        "Resume la info que hallaste y proporciona una recomendación final."
     )
+
+    prompt_template = ChatPromptTemplate.from_messages([
+        ("system", system_instruction),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("human", "{input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
+    ])
+
+    # Create Agent
+    agent = create_tool_calling_agent(llm, tools, prompt_template)
     
-    chat = model.start_chat()
-    
-    # Send initial prompt with instructions + user query
-    # We combine the system instruction-like prefix with the user query for the single turn or multi-turn
-    full_prompt = (
-        f"Eres un analista experto en Forex. Usa los tools disponibles para obtener precios, indicadores técnicos, noticias y sentimientos. "
-        f"Analiza la consulta del usuario: '{prompt}'. Proporciona un análisis detallado, incluyendo tendencias basadas en promedios móviles, "
-        f"MACD, RSI, ADX, Bollinger Bands, precios recientes, sentimientos de noticias y recomendaciones basadas en datos.\n"
-        f"IMPORTANTE: Si falta un parámetro obligatorio (como 'symbol'), intenta inferirlo o preguntar. Para 'symbol', usa el formato estándar (ej. EURUSD, USDJPY)."
-    )
+    # Create Agent Executor
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
     
     try:
-        response = chat.send_message(full_prompt)
-        
-        # Helper to handle tool calls
-        # Loop while the model asks for function calls
-        max_turns = 10
-        turn = 0
-        
-        while response.parts and any(part.function_call for part in response.parts) and turn < max_turns:
-            turn += 1
-            parts = []
-            for part in response.parts:
-                if part.function_call:
-                    func_name = part.function_call.name
-                    func_args = dict(part.function_call.args)
-                    
-                    # Call the appropriate function
-                    # Using a mapping would be cleaner but if-elif is safe enough here
-                    func_response = {"error": "Unknown function"}
-                    
-                    if func_name == "get_fx_daily": func_response = get_fx_daily(**func_args)
-                    elif func_name == "get_fx_intraday": func_response = get_fx_intraday(**func_args)
-                    elif func_name == "get_fx_weekly": func_response = get_fx_weekly(**func_args)
-                    elif func_name == "get_fx_monthly": func_response = get_fx_monthly(**func_args)
-                    elif func_name == "get_news_sentiment": func_response = get_news_sentiment(**func_args)
-                    elif func_name == "get_sma": func_response = get_sma(**func_args)
-                    elif func_name == "get_ema": func_response = get_ema(**func_args)
-                    elif func_name == "get_macd": func_response = get_macd(**func_args)
-                    elif func_name == "get_rsi": func_response = get_rsi(**func_args)
-                    elif func_name == "get_adx": func_response = get_adx(**func_args)
-                    elif func_name == "get_bbands": func_response = get_bbands(**func_args)
-                    
-                    # Append response part
-                    parts.append(
-                        content_types.to_part({
-                            "function_response": {
-                                "name": func_name,
-                                "response": func_response
-                            }
-                        })
-                    )
-            
-            # Send function responses back to the model
-            response = chat.send_message(parts)
-            
-        return response.text
+        # We handle chat history in the Streamlit app, but here we pass an empty list for the single turn logic
+        # or we could pass the full history if we wanted. For now, matching previous behavior.
+        result = agent_executor.invoke({"input": prompt, "chat_history": []})
+        return result["output"]
     except Exception as e:
-        return f"Error interacting with Gemini: {str(e)}"
+        return f"Error interacting with {provider}: {str(e)}"
